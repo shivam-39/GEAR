@@ -1610,11 +1610,16 @@ class SimulatedGearLlamaForCausalLM(LlamaPreTrainedModel):
         inputs_embeds=None,
         **kwargs,
     ):
+        if isinstance(past_key_values, tuple) and len(past_key_values) == 0:
+            past_key_values = None
+
         if past_key_values is not None:
-            if isinstance(past_key_values, Cache):
+            if isinstance(past_key_values, Cache) or hasattr(past_key_values, "get_seq_length"):
                 cache_length = past_key_values.get_seq_length()
                 past_length = past_key_values.seen_tokens
                 max_cache_length = past_key_values.get_max_length()
+            elif hasattr(past_key_values, "__len__") and len(past_key_values) == 0:
+                past_key_values = None
             else:
                 cache_length = past_length = past_key_values[0][0].shape[2]
                 max_cache_length = None

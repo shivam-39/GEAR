@@ -347,7 +347,7 @@ if __name__ == "__main__":
     evaluation_result_file = output_dir / f"evaluation_gsm8k.json"
 
     split = "test" if args.example_subset is None else f"test[{args.example_subset}]"
-    eval_dataset = load_dataset("gsm8k", "main", split=split, ignore_verifications=True)
+    eval_dataset = load_dataset("gsm8k", "main", split=split)
     tb_writter = SummaryWriter(log_dir=str(output_dir.resolve()))
     logging.basicConfig(
         filename=os.path.join(output_dir.resolve(), "log.txt"),
@@ -361,7 +361,7 @@ if __name__ == "__main__":
     # Load Model and Tokenizer
     model_kwargs = {}
 
-    if "Llama-2" or "Mistral" in args.model:
+    if "Llama-2" in args.model or "Mistral" in args.model or "tinyllama" in args.model.lower():
         model_kwargs["torch_dtype"] = torch.float16
         model_kwargs["device_map"] = "auto"
         model_kwargs["token"] = args.hf_token
@@ -371,7 +371,6 @@ if __name__ == "__main__":
     
     config = transformers.AutoConfig.from_pretrained(
         args.model,
-        use_auth_token=True,
         token=args.hf_token,
         use_flash_attn=False,
         trust_remote_code=True,
@@ -406,7 +405,7 @@ if __name__ == "__main__":
         compress_config.copy_for_all_attention()
         compress_config.calculate_compress_ratio_list(4095, 4096)
     
-    if "Llama" in args.model:
+    if "Llama" in args.model or "tinyllama" in args.model.lower():
        
         model = SimulatedGearLlamaForCausalLM.from_pretrained(
             args.model,
@@ -427,7 +426,6 @@ if __name__ == "__main__":
         from transformers import AutoTokenizer
         config = MistralConfig.from_pretrained(
             args.model,
-            use_auth_token=True,
             token=args.hf_token,
             use_flash_attn=False,
             trust_remote_code=True,

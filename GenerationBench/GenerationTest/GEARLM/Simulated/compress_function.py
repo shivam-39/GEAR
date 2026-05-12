@@ -4,6 +4,15 @@ import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
 
+
+class H2OCache:
+    def __init__(self, size: int):
+        self.size = size
+
+    def selection(self, attn_weights, key_states, value_states, query_states):
+        return key_states, value_states, query_states
+
+
 def fake_groupwise_token_asymmetric_quantization( ####
     input: torch.Tensor, quantize_bit, group_size=128
 ):
