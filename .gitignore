@@ -23,3 +23,5 @@
 
 /GEARLM/GEARLM.egg-info
 
+*outputs/
+*ipynb_checkpoints/

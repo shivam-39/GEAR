@@ -42,7 +42,7 @@ from transformers.modeling_outputs import (
     CausalLMOutputWithPast,
     SequenceClassifierOutputWithPast,
 )
-from transformers.modeling_utils import PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel, GenerationMixin
 from transformers.utils import (
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
@@ -1169,7 +1169,7 @@ class MistralModel(MistralPreTrainedModel):
         )
 
 
-class SimulatedGearMistralForCausalLM(MistralPreTrainedModel):
+class SimulatedGearMistralForCausalLM(MistralPreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config,compress_config = None):

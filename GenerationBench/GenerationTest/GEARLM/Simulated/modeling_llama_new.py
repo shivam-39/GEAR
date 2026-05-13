@@ -41,7 +41,7 @@ from transformers.modeling_outputs import (
     CausalLMOutputWithPast,
     SequenceClassifierOutputWithPast,
 )
-from transformers.modeling_utils import PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel, GenerationMixin
 from transformers.pytorch_utils import (
     ALL_LAYERNORM_LAYERS,
     is_torch_greater_or_equal_than_1_13,
@@ -1464,7 +1464,7 @@ class LlamaModel(LlamaPreTrainedModel):
         )
 
 
-class SimulatedGearLlamaForCausalLM(LlamaPreTrainedModel):
+class SimulatedGearLlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config, compress_config=None):
