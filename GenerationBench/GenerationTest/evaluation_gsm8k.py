@@ -366,7 +366,7 @@ if __name__ == "__main__":
         model_kwargs["device_map"] = "auto"
         model_kwargs["token"] = args.hf_token
         model_kwargs["cache_dir"] = "../cache"
-        model_kwargs["offload_buffers"] = True
+        # model_kwargs["offload_buffers"] = True
     else:
         raise ValueError(f"Model {args.model} not supported")
     
