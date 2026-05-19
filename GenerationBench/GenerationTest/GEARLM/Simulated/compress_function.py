@@ -5,7 +5,8 @@ import torch.nn as nn
 import numpy as np
 
 
-def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.5):
+def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
+    # print("Calculating adaptive rank...")
     shape = tensor.shape
     batch, num_head, seq_len, head_dim = shape
     tensor = tensor.float()
@@ -96,7 +97,7 @@ def fake_poweriteration_group(input: torch.Tensor, loop, rank, device, p_base, q
     # Use adaptive rank if no rank is passed (rank <= 0)
     # if rank <= 0:
     adaptive_ranks = get_adaptive_rank(input)
-    rank = int(torch.mean(adaptive_ranks).item())
+    rank = int(torch.mean(adaptive_ranks.float()).item())
 
     input = input.float()
     if q_base is not None and p_base is not None:

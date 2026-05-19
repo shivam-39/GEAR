@@ -318,6 +318,7 @@ def headwise_lrap(tensor: torch.Tensor, rank, loop):
 
 
 def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
+    # print("Calculating adaptive rank...")
     shape = tensor.shape
     batch, num_head, seq_len, head_dim = shape
     tensor = tensor.float()

@@ -2,6 +2,23 @@ import torch
 import time
 
 
+def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
+    """Calculate adaptive rank based on SVD energy threshold."""
+    # Reshape tensor to [batch*num_head, seq_len, sep_dim] for SVD
+    print(f"[GET_ADAPTIVE_RANK] Computing SVD for tensor shape {tensor.shape}")
+    if tensor.dim() == 4:
+        batch, num_head, seq_len, sep_dim = tensor.shape
+        tensor_reshaped = tensor.permute(0, 1, 2, 3).reshape(batch * num_head, seq_len, sep_dim)
+    else:
+        tensor_reshaped = tensor
+    
+    tensor_float = tensor_reshaped.float()
+    u, s, v = torch.linalg.svd(tensor_float, full_matrices=False)
+    energy = torch.cumsum(s**2, dim=-1) / torch.sum(s**2, dim=-1, keepdim=True)
+    rank = torch.sum(energy < energy_threshold, dim=-1)
+    return rank
+
+
 def transfer_8bit_to_4bit(input: torch.Tensor):
     # shape
     assert input.dtype == torch.uint8
@@ -135,6 +152,15 @@ def true_poweriteration(input: torch.Tensor, loop, rank, p_base=None, q_base=Non
     # p_base = torch.rand(input.shape[3] * input.shape[1], rank).to(device)
     # q_base = torch.rand(input.shape[0] * input.shape[2], rank).to(device)
     batch, num_head, seq_len, sep_dim = input.shape
+    
+    # Use adaptive rank if no rank is passed (rank <= 0)
+    # if rank <= 0:
+    adaptive_ranks = get_adaptive_rank(input)
+    rank = int(torch.mean(adaptive_ranks).item())
+    print(f"[TRUE_POWERITERATION] USING ADAPTIVE RANK: {rank} (shape: {batch}x{num_head}x{seq_len}x{sep_dim})")
+    # else:
+        # print(f"[TRUE_POWERITERATION] USING FIXED RANK: {rank}")
+    
     input = (
         input.permute(0, 2, 1, 3).contiguous().view(batch, seq_len, sep_dim * num_head)
     )  # convert to 32bits for qr decomposition
