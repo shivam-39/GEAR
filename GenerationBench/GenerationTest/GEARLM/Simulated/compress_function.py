@@ -5,6 +5,16 @@ import torch.nn as nn
 import numpy as np
 
 
+def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.5):
+    shape = tensor.shape
+    batch, num_head, seq_len, head_dim = shape
+    tensor = tensor.float()
+    u, s, v = torch.linalg.svd(tensor)
+    energy = torch.cumsum(s**2, dim=-1) / torch.sum(s**2, dim=-1, keepdim=True)
+    rank = torch.sum(energy < energy_threshold, dim=-1)
+    return rank
+
+
 class H2OCache:
     def __init__(self, size: int):
         self.size = size
@@ -83,6 +93,10 @@ def fake_poweriteration_group(input: torch.Tensor, loop, rank, device, p_base, q
     dtype = input.dtype
     batch, dim1, dim2, dim3 = input.shape
 
+    # Use adaptive rank if no rank is passed (rank <= 0)
+    # if rank <= 0:
+    adaptive_ranks = get_adaptive_rank(input)
+    rank = int(torch.mean(adaptive_ranks).item())
 
     input = input.float()
     if q_base is not None and p_base is not None:

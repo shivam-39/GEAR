@@ -290,7 +290,10 @@ def triton_quantize_and_pack_along_last_dim_witherror(data: torch.Tensor, group_
 
 def headwise_lrap(tensor: torch.Tensor, rank, loop):
 
-    rank = get_adaptive_rank(tensor)
+    # Use adaptive rank if no rank is passed (rank <= 0)
+    # if rank <= 0:
+    adaptive_ranks = get_adaptive_rank(tensor)
+    rank = int(torch.mean(adaptive_ranks).item())
 
     dtype = tensor.dtype
     shape = tensor.shape
@@ -314,7 +317,7 @@ def headwise_lrap(tensor: torch.Tensor, rank, loop):
     return p_base, q_base
 
 
-def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.5):
+def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
     shape = tensor.shape
     batch, num_head, seq_len, head_dim = shape
     tensor = tensor.float()
