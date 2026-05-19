@@ -1,0 +1,8 @@
+05/15/2026 15:11:23 - INFO - root - Using device: mps
+05/15/2026 15:11:23 - INFO - root - compress_config: None
+05/15/2026 15:11:23 - INFO - root - Loading TrueCompression Llama model from: meta-llama/Llama-2-7b-hf
+05/15/2026 15:12:29 - INFO - root - Model parameters on device: mps:0 (sample dtype=torch.float16)
+05/15/2026 15:12:30 - INFO - root - Preprocessing the dataset.
+05/15/2026 15:26:00 - INFO - root - Using device: mps
+05/15/2026 15:26:00 - INFO - root - compress_config: None
+05/15/2026 15:26:01 - INFO - root - Loading TrueCompression Llama model from: meta-llama/Llama-2-7b-hf

@@ -1,0 +1,2 @@
+05/15/2026 14:26:03 - INFO - root - Using device: mps
+05/15/2026 14:26:03 - INFO - root - compress_config: None

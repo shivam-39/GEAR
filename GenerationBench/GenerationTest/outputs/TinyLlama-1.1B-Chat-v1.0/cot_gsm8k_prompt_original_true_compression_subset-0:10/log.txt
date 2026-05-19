@@ -1,0 +1,7 @@
+05/16/2026 15:25:28 - INFO - root - Using device: mps
+05/16/2026 15:25:28 - INFO - root - compress_config: {'compress_mode': 'gear_batch', 'quantize_bit': 8, 'rank': 0.1, 'loop': 3, 'left': 0.1, 'buffer_len': 32, 'stream': False, 'streaming_gap': 1, 'sink_tokens': 50, 'recency_tokens': 70}
+05/16/2026 15:25:28 - INFO - root - Loading TrueCompression Llama model from: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+05/16/2026 15:25:31 - INFO - root - Model parameters on device: mps:0 (sample dtype=torch.float16)
+05/16/2026 15:25:31 - INFO - root - Preprocessing the dataset.
+05/16/2026 15:25:31 - INFO - root - Parsed 8 few-shot examples from prompt file.
+05/16/2026 15:28:29 - INFO - root - Accuracy: 0.1

@@ -134,6 +134,8 @@ def true_poweriteration(input: torch.Tensor, loop, rank, p_base=None, q_base=Non
     # -> [batch,seq_len,model_dim] -> [batch * seq_len,model_dim]
     # p_base = torch.rand(input.shape[3] * input.shape[1], rank).to(device)
     # q_base = torch.rand(input.shape[0] * input.shape[2], rank).to(device)
+    loop = int(loop)   ##check is int casting required
+    rank = int(rank)
     batch, num_head, seq_len, sep_dim = input.shape
     input = (
         input.permute(0, 2, 1, 3).contiguous().view(batch, seq_len, sep_dim * num_head)
@@ -308,7 +310,8 @@ def fake_quant_error_simulation_batchwise(input: torch.Tensor, quantize_bit, bsz
     min = min.unsqueeze(1)  # Expand min tensor shape to (bsz, 1)
     step = step.unsqueeze(1)  # Expand step tensor shape to (bsz, 1)
     # print("before min max:",min,max,step)
-    error = input - torch.round((input - min) / step)
+    # error = input - torch.round((input - min) / step)
+    error = input - (torch.round((input - min) / step) * step + min)
     return error, min, step
 
 
