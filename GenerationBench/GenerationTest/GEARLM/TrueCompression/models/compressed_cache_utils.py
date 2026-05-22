@@ -122,11 +122,11 @@ class FPBuffer:
                 self._recency = new_tokens[..., T - self.recency_tokens:, :]
                 self._buffer = None
                 self._initialised = True
-                print(
-                    f"[FPBuffer] PREFILL SPLIT | prefill_len={T} | "
-                    f"sink={self.sink_tokens} | recency={self.recency_tokens} | "
-                    f"buffer=0 | compressed={to_compress.shape[-2]}"
-                )
+                # print(
+                #     f"[FPBuffer] PREFILL SPLIT | prefill_len={T} | "
+                #     f"sink={self.sink_tokens} | recency={self.recency_tokens} | "
+                #     f"buffer=0 | compressed={to_compress.shape[-2]}"
+                # )
                 return to_compress
 
             # PREFILL OK: fits entirely in FP — carve into zones, no compression
@@ -153,11 +153,11 @@ class FPBuffer:
                 if self._recency is not None else new_tokens
             )
             floor = self.sink_tokens + self.recency_tokens
-            print(
-                f"[FPBuffer] FILLING | total_fp={self.total_len()} | "
-                f"floor={floor} (sink={self.sink_tokens} + recency={self.recency_tokens}) | "
-                f"need={floor - self.total_len()} more"
-            )
+            # print(
+            #     f"[FPBuffer] FILLING | total_fp={self.total_len()} | "
+            #     f"floor={floor} (sink={self.sink_tokens} + recency={self.recency_tokens}) | "
+            #     f"need={floor - self.total_len()} more"
+            # )
             return None
 
         # Accumulate into buffer zone
@@ -169,11 +169,11 @@ class FPBuffer:
         # Check flush threshold
         if self._buffer_len_cur() < self.buffer_len:
             floor = self.sink_tokens + self.recency_tokens
-            print(
-                f"[FPBuffer] FILLING | total_fp={self.total_len()} | "
-                f"floor={floor} (sink={self.sink_tokens} + recency={self.recency_tokens}) | "
-                f"need={self.buffer_len - self._buffer_len_cur()} more in buffer"
-            )
+            # print(
+            #     f"[FPBuffer] FILLING | total_fp={self.total_len()} | "
+            #     f"floor={floor} (sink={self.sink_tokens} + recency={self.recency_tokens}) | "
+            #     f"need={self.buffer_len - self._buffer_len_cur()} more in buffer"
+            # )
             return None
 
         # FLUSH: compress recency[:buffer_len], slide recency window forward
@@ -184,12 +184,12 @@ class FPBuffer:
         )
         self._buffer = None
         fp_after = self.total_len()
-        print(
-            f"[FPBuffer] FLUSH | total_fp={total_before_flush} | "
-            f"sink={self._sink_len()} | recency={self._recency_len()} | "
-            f"buffer={self._buffer_len_cur()} | "
-            f"tokens_to_compress={to_compress.shape[-2]} | fp_after={fp_after}"
-        )
+        # print(
+        #     f"[FPBuffer] FLUSH | total_fp={total_before_flush} | "
+        #     f"sink={self._sink_len()} | recency={self._recency_len()} | "
+        #     f"buffer={self._buffer_len_cur()} | "
+        #     f"tokens_to_compress={to_compress.shape[-2]} | fp_after={fp_after}"
+        # )
         return to_compress
 
 

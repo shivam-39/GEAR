@@ -18,17 +18,11 @@ Q: A robe takes 2 bolts of blue fiber and half that much white fiber.  How many 
 A_model:
 Let's think step by step
 Bolt number one (blue) requires 2 bolls of blue fibers. Bold no. Two (white) also needs 2 bolls of white fibers. So we need:
-Blue Bolt No.: Blue Fiber Needed / White Fiber Needed = Total Number Of Bolses Required
-   |                    |             |              |               |                |
-   |-------------------|--------------|--------------|---------------|---------------|
-   | Blue Fibers      | Blue Bolts     | White Fibers | White Bolts       | Total Bolts        |
-   |-------------------|--------------|--------------|---------------|---------------|
-   | 2                 | 2              | 2              | 2               | 4                |
-   |-------------------|--------------|--------------|---------------|---------------|
-Total Bolts:          |                    |              |               |                |
-   |-------------------|--------------|--------------|---------------|---------------|
-   | Blue Bolts         | White Bolts    | Total Bolts    |
-   |--------------------|---------------------
+Blue Bolt No.: Blue Fiber Needed / White Fiber Needed = Total Number Of Bols
+   |                    |              |             |            |           |          |         |       |      |     |        |
+Blue Bolt No. 1: 2/2 = 1 | White Bolt No. 1: 2/2 = 1 | White Bolt No. 2: 2/2 = 1 | White Bolt No. 2: 2/2 = 1 | Total: 2/2 = 1 | 1/2 = 0.5 | 0/2 = 0 | 0/2 = 0 |
+Total: 1/2 = 0.5 | 1/2 = 0 | 0/2 = 0 | 0/2 = 0 |
+The answer is 1/2 or 0.5.
 A:
 It takes 2/2=<<2/2=1>>1 bolt of white fiber
 So the total amount of fabric is 2+1=<<2+1=3>>3 bolts of fabric
@@ -60,17 +54,19 @@ Now let's calculate the number of meters he covers:
 
 Number of Sessions × Time Per Session × Distance Covered / Seconds/ Meter = Total Meters Run
 
-Time Per Session × Number of Sessions = Four Minutes
-Distance covered / Seconds/ Metre = Six Hundred metres
-Total Meters Run = 600 m x 4 min x 6 hm/sec = 3,600 m
+Total Meters Run = Number of Sessions × Times per Session × Distance covered / seconds per second
 
-We can divide this value into 3 equal parts as follows:
+(4 mins) × (3 sprints) × (60m) = 2400 meters
 
-Part A: 3,600 m divided by 3 = 1,333.33 m
-Part B: Part A divided by 6 hours = 2.16 km
-Part C: Part B divided by seconds/km = 1.33 km/hour or 1.33 kph
+Summing up these values gives us:
 
-And finally we
+Total Meters Run = 2400 meters
+
+We can divide this value into 60 to get an average distance covered per mile or kilometer:
+
+Average Distance Covered per Kilometer = Total Meters Run / 60 = 2400 / 60 = 4 miles per hour
+
+Hence, James needs to cover around 4 miles per week to achieve his goal of running
 A:
 He sprints 3*3=<<3*3=9>>9 times
 So he runs 9*60=<<9*60=540>>540 meters
@@ -164,9 +160,12 @@ Step 1: John drove for 3 hours at a speed of 60 miles per hour (MPH). This means
 
 Step 2: At the beginning of Step 1, John realized he needed to turn back due to forgetting something extremely important at home. So, he turned around and headed towards home again.
 
-Step 3: During Step 2, John spent about one hour standing still in traffic. The amount of time it took him to stop and wait in traffic depends on various factors such as road conditions, weather, etc., so we can only estimate its duration based on general information available online or through other sources. In your case, it could take anywhere between ½ hour up to several minutes depending upon these variables.
+Step 3: During Step 2, John spent about one hour standing still in traffic. The amount of time it took him to stop and wait in traffic depends on various factors such as road conditions, weather, etc., so we can only estimate its duration based on general information available online or through other sources. In your case, it would likely take anywhere between ½ hour and ¾ hour to complete this task.
 
-Now let us calculate the distance traveled by John while turning around and heading back to home. We assume that he initially arrived at home at 1 PM, which would mean that he stopped at 1PM when he decided to turn around and go back home instead of continuing straight ahead. Therefore, his initial arrival time at home should be considered
+Now let's calculate the distance traveled over these three steps using the formula D=V*t where V represents the vehicle velocity and T represents the number of seconds elapsed since starting the journey. Here's our calculation:
+
+D = V*(T)
+D = 60(3)(0.6)*0
 A:
 When he turned around he was 3*60=<<3*60=180>>180 miles from home
 He was only able to drive 4-2=<<4-2=2>>2 hours in the first four hours
@@ -186,7 +185,7 @@ $$\frac{40}{4} \times 10 = 10 $$
 And since she worked 45 hours this week, we can calculate her final earning as follows:
 $$Earlier Week Earnings = Earlier Total Hours Worked * Earlier Wages Per Hour + Overtime Payment = 10 * 45 + 12*(1+$.2)$$
 Now let's multiply both sides by $(1+$.2)$ which gives us:
-$$Earlier Week Earnings = 10 * 45 + 12((1+$.2)^2)+1.2x10=(13.2+1)*10+(1.2^
+$$Earlier Week Earnings = 10 * 45 + 12((1+$.2)^2)+1.2*12=(13.2+1)*.$1^2+(1.
 A:
 Eliza is entitled to 45 -40 = <<45-40=5>>5 hours overtime pay.
 Her hourly rate for the overtime pay is $10 x 1.2 = $<<10*1.2=12>>12.

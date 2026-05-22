@@ -5,7 +5,7 @@ import time
 def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
     """Calculate adaptive rank based on SVD energy threshold."""
     # Reshape tensor to [batch*num_head, seq_len, sep_dim] for SVD
-    print(f"[GET_ADAPTIVE_RANK] Computing SVD for tensor shape {tensor.shape}")
+    # print(f"[GET_ADAPTIVE_RANK] Computing SVD for tensor shape {tensor.shape}")
     if tensor.dim() == 4:
         batch, num_head, seq_len, sep_dim = tensor.shape
         tensor_reshaped = tensor.permute(0, 1, 2, 3).reshape(batch * num_head, seq_len, sep_dim)
@@ -158,8 +158,8 @@ def true_poweriteration(input: torch.Tensor, loop, rank, p_base=None, q_base=Non
     # Use adaptive rank if no rank is passed (rank <= 0)
     # if rank <= 0:
     adaptive_ranks = get_adaptive_rank(input)
-    rank = int(torch.mean(adaptive_ranks).item())
-    print(f"[TRUE_POWERITERATION] USING ADAPTIVE RANK: {rank} (shape: {batch}x{num_head}x{seq_len}x{sep_dim})")
+    rank = int(torch.mean(adaptive_ranks.float()).item())
+    # print(f"[TRUE_POWERITERATION] USING ADAPTIVE RANK: {rank} (shape: {batch}x{num_head}x{seq_len}x{sep_dim})")
     # else:
         # print(f"[TRUE_POWERITERATION] USING FIXED RANK: {rank}")
     
