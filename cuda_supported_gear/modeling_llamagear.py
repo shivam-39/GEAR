@@ -14,6 +14,130 @@ from transformers.models.llama.modeling_llama import *
 from transformers.modeling_attn_mask_utils import _prepare_4d_causal_attention_mask
 
 _CONFIG_FOR_DOC = "LlamaConfig"
+
+
+class FPBuffer:
+    """
+    Three-zone full-precision buffer for KV-cache tokens.
+
+    Layout (contiguous in sequence order):
+        [ sink_tokens | recency_tokens | buffer_len ]
+
+    sink     : first `sink_tokens` of the prefill — always FP, never compressed.
+    recency  : rolling FP window of size `recency_tokens`.
+    buffer   : accumulation zone; triggers a flush when it reaches `buffer_len`
+               tokens. On flush, recency[:buffer_len] is returned for compression
+               and the recency window slides forward:
+                   new_recency = recency[buffer_len:] + buffer
+                   buffer      = empty
+    """
+
+    def __init__(self, sink_tokens: int, recency_tokens: int, buffer_len: int):
+        self.sink_tokens    = sink_tokens
+        self.recency_tokens = recency_tokens
+        self.buffer_len     = buffer_len
+
+        self._sink    : Optional[torch.Tensor] = None
+        self._recency : Optional[torch.Tensor] = None
+        self._buffer  : Optional[torch.Tensor] = None
+        self._initialised = False
+
+        if recency_tokens == 0 and buffer_len > 0:
+            raise ValueError(
+                "recency_tokens=0 is invalid when buffer_len > 0 — "
+                "the flush window would always be empty."
+            )
+
+    # ── helpers ──────────────────────────────────────────────────────────────
+
+    def _sink_len(self) -> int:
+        return self._sink.shape[-2] if self._sink is not None else 0
+
+    def _recency_len(self) -> int:
+        return self._recency.shape[-2] if self._recency is not None else 0
+
+    def _buffer_len_cur(self) -> int:
+        return self._buffer.shape[-2] if self._buffer is not None else 0
+
+    def total_len(self) -> int:
+        return self._sink_len() + self._recency_len() + self._buffer_len_cur()
+
+    # ── public API ────────────────────────────────────────────────────────────
+
+    def get_fp_view(self) -> Optional[torch.Tensor]:
+        """Return [sink | recency | buffer] concatenated — used by attention."""
+        parts = [p for p in (self._sink, self._recency, self._buffer) if p is not None]
+        if not parts:
+            return None
+        return torch.cat(parts, dim=-2)
+
+    def append(self, new_tokens: torch.Tensor) -> Optional[torch.Tensor]:
+        """
+        Ingest new_tokens (shape [B, H, T, D]) into the buffer.
+
+        Returns the tensor of tokens that must be sent to the compression
+        pipeline, or None if no flush is needed yet.
+
+        Cases:
+          PREFILL SPLIT : first call and T > total capacity  — compress middle.
+          PREFILL OK    : first call and T fits              — no compression.
+          FILLING       : warm-up; recency zone not yet full — keep accumulating.
+          FLUSH         : buffer zone full                   — compress recency[:buffer_len].
+        """
+        T = new_tokens.shape[-2]
+
+        # ── First call: prefill ───────────────────────────────────────────────
+        if not self._initialised:
+            total_capacity = self.sink_tokens + self.recency_tokens + self.buffer_len
+
+            if T > total_capacity:
+                # PREFILL SPLIT: compress the middle, keep sink + last recency_tokens
+                to_compress   = new_tokens[..., self.sink_tokens: T - self.recency_tokens, :]
+                self._sink    = new_tokens[..., :self.sink_tokens, :]
+                self._recency = new_tokens[..., T - self.recency_tokens:, :]
+                self._buffer  = None
+                self._initialised = True
+                return to_compress
+
+            # PREFILL OK: everything fits in FP — carve into zones
+            self._sink    = new_tokens[..., :self.sink_tokens, :]
+            remainder     = new_tokens[..., self.sink_tokens:, :]
+            recency_part  = min(self.recency_tokens, remainder.shape[-2])
+            self._recency = remainder[..., :recency_part, :]
+            buf_part      = remainder[..., recency_part:, :]
+            self._buffer  = buf_part if buf_part.shape[-2] > 0 else None
+            self._initialised = True
+            return None
+
+        # ── Subsequent calls: decoding ────────────────────────────────────────
+
+        # Warm-up: fill recency zone to its target size before using buffer zone
+        if self._recency_len() < self.recency_tokens:
+            self._recency = (
+                torch.cat([self._recency, new_tokens], dim=-2)
+                if self._recency is not None else new_tokens
+            )
+            return None
+
+        # Accumulate into buffer zone
+        self._buffer = (
+            torch.cat([self._buffer, new_tokens], dim=-2)
+            if self._buffer is not None else new_tokens
+        )
+
+        # Check flush threshold
+        if self._buffer_len_cur() < self.buffer_len:
+            return None
+
+        # FLUSH: compress recency[:buffer_len], slide recency window forward
+        to_compress   = self._recency[..., :self.buffer_len, :]
+        self._recency = torch.cat(
+            [self._recency[..., self.buffer_len:, :], self._buffer], dim=-2
+        )
+        self._buffer  = None
+        return to_compress
+
+
 def if_not_then_None(variable):
     try:
         variable
@@ -131,6 +255,9 @@ class LlamaAttention_GEAR(nn.Module):
         self.v_bits = config.v_bits
         self.group_size = config.group_size
         self.residual_length = compress_config["residual"]
+        self.sink_tokens    = compress_config.get("sink_tokens",    4)
+        self.recency_tokens = compress_config.get("recency_tokens", self.residual_length)
+        self.buffer_len     = compress_config.get("buffer_len",     self.residual_length)
 
         if (self.head_dim * self.num_heads) != self.hidden_size:
             raise ValueError(
@@ -223,6 +350,8 @@ class LlamaAttention_GEAR(nn.Module):
             value_states_q = past_key_value[14]
             value_states_index = past_key_value[15]
             value_states_value = past_key_value[16]
+            key_fp_buffer   = past_key_value[17]  #unpacked key buffer
+            value_fp_buffer = past_key_value[18]  #unpacked value buffer
             #### Notion
             # key_states_p batch,num_head,seqlen/buffer,rank
             # key_states_q batch,num_head,head_dim,rank
@@ -252,23 +381,33 @@ class LlamaAttention_GEAR(nn.Module):
                 #### it seeems that we will not be here
                 att_qkquant = None
 
-            if key_states_full is not None:
-                key_states_full = torch.cat([key_states_full, key_states], dim=2)
-            else:
-                key_states_full = key_states
-            att_qkfull = torch.matmul(query_states, key_states_full.transpose(2, 3))
+            # if key_states_full is not None:
+            #     key_states_full = torch.cat([key_states_full, key_states], dim=2)
+            # else:
+            #     key_states_full = key_states #starting the new buffer /sequence
+            to_compress_key=key_fp_buffer.append(key_states) #append every new token to the key buffer at decode 
+            to_compress_value=value_fp_buffer.append(value_states) #append every new token to the value buffer at decode 
+            # att_qkfull = torch.matmul(query_states, key_states_full.transpose(2, 3))
+            # if att_qkquant is not None:
+            #     attn_weights = torch.cat([att_qkquant, att_qkfull], dim=-1) / math.sqrt(self.head_dim)
+            # else:
+            #     attn_weights = att_qkfull / math.sqrt(self.head_dim)
+            fp_key_view = key_fp_buffer.get_fp_view()
+            sink_len    = key_fp_buffer._sink_len()
             if att_qkquant is not None:
-                attn_weights = torch.cat([att_qkquant, att_qkfull], dim=-1) / math.sqrt(self.head_dim)
+                sink_k    = fp_key_view[..., :sink_len, :]
+                tail_k    = fp_key_view[..., sink_len:, :]
+                att_sink  = torch.matmul(query_states, sink_k.transpose(2, 3))
+                att_tail  = torch.matmul(query_states, tail_k.transpose(2, 3))
+                attn_weights = torch.cat([att_sink, att_qkquant, att_tail], dim=-1) / math.sqrt(self.head_dim)  #split according to sink, tail and quant    
             else:
-                attn_weights = att_qkfull / math.sqrt(self.head_dim)
+                attn_weights = torch.matmul(query_states, fp_key_view.transpose(2, 3)) / math.sqrt(self.head_dim)
+            key_states_full = fp_key_view
 
-            if key_states_full.shape[-2] == self.residual_length:
-                assert self.residual_length % self.group_size == 0
-                key_states_quant_trans_new, key_scale_trans_new, key_mn_trans_new, key_states_p_new,key_states_q_new = key_compression(
-                    key_states_full.transpose(2, 3).contiguous(), self.compress_config
+            if to_compress_key is not None:
+                key_states_quant_trans_new, key_scale_trans_new, key_mn_trans_new, key_states_p_new, key_states_q_new = key_compression(
+                    to_compress_key.transpose(2, 3).contiguous(), self.compress_config
                 )
-                
-                key_states_full = None
                 if key_states_quant_trans is not None:
                     key_states_quant_trans = torch.cat([key_states_quant_trans, key_states_quant_trans_new], dim=3)
                     key_scale_trans = torch.cat([key_scale_trans, key_scale_trans_new], dim=3)
@@ -282,9 +421,8 @@ class LlamaAttention_GEAR(nn.Module):
                         else:
                             key_states_p_new = key_states_p_new.unsqueeze(0)
                             key_states_q_new = key_states_q_new.unsqueeze(0)
-                            key_states_p[1] = torch.concat([key_states_p[1],key_states_p_new],dim = 0)
-                            key_states_q[1] = torch.concat([key_states_q[1],key_states_q_new],dim = 0)
-
+                            key_states_p[1] = torch.concat([key_states_p[1], key_states_p_new], dim=0)
+                            key_states_q[1] = torch.concat([key_states_q[1], key_states_q_new], dim=0)
                 else:
                     key_states_quant_trans = key_states_quant_trans_new
                     key_scale_trans = key_scale_trans_new
@@ -311,28 +449,45 @@ class LlamaAttention_GEAR(nn.Module):
 
             # upcast attention to fp32
             attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-            if value_states_full is not None:
-                value_states_full = torch.cat([value_states_full, value_states], dim=2)
-            else:
-                value_states_full = value_states
-            # value_full_length = if value_full_length == None 0 else value_states_full.shape[-2]
-            if value_states_full == None:
-                value_full_length = 0
-            else:
-                value_full_length = value_states_full.shape[-2]
+            # if value_states_full is not None:
+            #     value_states_full = torch.cat([value_states_full, value_states], dim=2)
+            # else:
+            #     value_states_full = value_states
+            # # value_full_length = if value_full_length == None 0 else value_states_full.shape[-2]
+            # if value_states_full == None:
+            #     value_full_length = 0
+            # else:
+            #     value_full_length = value_states_full.shape[-2]
+            fp_val_view  = value_fp_buffer.get_fp_view()
+            fp_len       = fp_val_view.shape[-2]
+            sink_len_v   = value_fp_buffer._sink_len()
+            tail_len_v   = fp_len - sink_len_v
+            sink_v       = fp_val_view[..., :sink_len_v, :]
+            tail_v       = fp_val_view[..., sink_len_v:, :]
+            value_states_full = fp_val_view
+            # if value_states_quant is None:
+            #     attn_output = torch.matmul(attn_weights, value_states_full)
+            # else:
+            #     # attn_output = cuda_bmm_fA_qB_outer(self.group_size, attn_weights[:, :, :, :-value_full_length], value_states_quant, 
+            #     #                                 value_scale, value_mn, self.v_bits)
+            #     # prindsdt("layerid  ",self.layer_idx,"attn_weights",attn_weights[:, :, :, :-value_full_length].shape,"value_states_quant",value_states_quant.shape,"value_P",value_states_p.shape,"value_Q",value_states_q.shape)
+            #     attn_output = matmul_withlrap(self.compress_config["group_size"],attn_weights[:, :, :, :-value_full_length],value_states_quant,
+            #                                 value_scale,
+            #                                 value_mn, self.compress_config["quantize_bit"],value_states_p,value_states_q,
+            #                                 type = "value")
+            #     attn_output += torch.matmul(attn_weights[:, :, :, -value_full_length:], value_states_full)
             if value_states_quant is None:
-                attn_output = torch.matmul(attn_weights, value_states_full)
+                attn_output = torch.matmul(attn_weights, fp_val_view)
             else:
-                # attn_output = cuda_bmm_fA_qB_outer(self.group_size, attn_weights[:, :, :, :-value_full_length], value_states_quant, 
-                #                                 value_scale, value_mn, self.v_bits)
-                # prindsdt("layerid  ",self.layer_idx,"attn_weights",attn_weights[:, :, :, :-value_full_length].shape,"value_states_quant",value_states_quant.shape,"value_P",value_states_p.shape,"value_Q",value_states_q.shape)
-                attn_output = matmul_withlrap(self.compress_config["group_size"],attn_weights[:, :, :, :-value_full_length],value_states_quant,
-                                            value_scale,
-                                            value_mn, self.compress_config["quantize_bit"],value_states_p,value_states_q,
-                                            type = "value")
-                attn_output += torch.matmul(attn_weights[:, :, :, -value_full_length:], value_states_full)
-            
-            if value_full_length == self.residual_length:
+                quant_len   = kv_seq_len - fp_len
+                attn_output  = torch.matmul(attn_weights[..., :sink_len_v], sink_v)
+                attn_output += matmul_withlrap(self.compress_config["group_size"],
+                                            attn_weights[..., sink_len_v:sink_len_v + quant_len],
+                                            value_states_quant, value_scale, value_mn,
+                                            self.compress_config["quantize_bit"],
+                                            value_states_p, value_states_q, type="value")
+                attn_output += torch.matmul(attn_weights[..., sink_len_v + quant_len:], tail_v)
+            # if value_full_length == self.residual_length:
                 # print("here?")
                 # print(value_full_length)
                 # assert value_full_length == self.residual_length + 1
@@ -352,15 +507,19 @@ class LlamaAttention_GEAR(nn.Module):
                 #     value_states_quant = value_states_quant_new
                 #     value_scale = scale
                 #     value_mn = mn
-                value_states_quant_new, scale, mn, value_states_p_new,value_states_q_new = value_compression(
-                    value_states_full.contiguous(),
-                    self.compress_config
-                )
+                # value_states_quant_new, scale, mn, value_states_p_new,value_states_q_new = value_compression(
+                #     value_states_full.contiguous(),
+                #     self.compress_config
+                # )
                 
 
                 
 
-                value_states_full = None
+                # value_states_full = None
+            if to_compress_value is not None:
+                value_states_quant_new, scale, mn, value_states_p_new, value_states_q_new = value_compression(
+                    to_compress_value.contiguous(), self.compress_config
+                )    
                 if value_states_quant is not None:
                     value_states_quant = torch.cat([value_states_quant, value_states_quant_new], dim=2)
                     value_scale = torch.cat([value_scale, scale], dim=2)
@@ -384,23 +543,31 @@ class LlamaAttention_GEAR(nn.Module):
                     value_states_q = [value_states_q_new]
 
         else:
+            key_fp_buffer   = FPBuffer(self.sink_tokens, self.recency_tokens, self.buffer_len)
+            value_fp_buffer = FPBuffer(self.sink_tokens, self.recency_tokens, self.buffer_len)
+            to_compress_key=key_fp_buffer.append(key_states) #see if anything is added to push for comprssion 
+            to_compress_value=value_fp_buffer.append(value_states)  #initialization of the fp buffer  
+
+
             attn_weights = torch.matmul(query_states, 
                                         key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
             # quantize
-            if key_states.shape[-2] % self.residual_length != 0:
-                if key_states.shape[-2] < self.residual_length:
-                    key_states_quant = None
-                    key_states_full = key_states
-                else:
-                    key_states_quant = key_states[:, :, :-(key_states.shape[-2] % self.residual_length), :].contiguous()
-                    key_states_full = key_states[:, :, -(key_states.shape[-2] % self.residual_length):, :].contiguous()
-            else:
-                key_states_quant = key_states
-                key_states_full = None
-            if key_states_quant is not None:
+            # if key_states.shape[-2] % self.residual_length != 0:
+            #     if key_states.shape[-2] < self.residual_length:
+            #         key_states_quant = None
+            #         key_states_full = key_states
+            #     else:
+            #         key_states_quant = key_states[:, :, :-(key_states.shape[-2] % self.residual_length), :].contiguous()
+            #         key_states_full = key_states[:, :, -(key_states.shape[-2] % self.residual_length):, :].contiguous()
+            # else:
+            #     key_states_quant = key_states
+            #     key_states_full = None
+            if to_compress_key is not None:
                 #### initial quantization
                 key_states_quant_trans, key_scale_trans, key_mn_trans,key_states_p, key_states_q = key_compression(
-                    key_states_quant.transpose(2, 3).contiguous(),
+                    # key_states_quant.transpose(2, 3).contiguous(),
+                    # self.compress_config
+                    to_compress_key.transpose(2, 3).contiguous(),
                     self.compress_config
                 )
                 key_states_p = [key_states_p]
@@ -412,26 +579,40 @@ class LlamaAttention_GEAR(nn.Module):
                 key_scale_trans = None
                 key_mn_trans = None
                 key_states_p, key_states_q = None, None
+            key_states_full = key_fp_buffer.get_fp_view()    
             
-            if value_states.shape[-2] <= self.residual_length:
-                value_states_quant = None
-                value_states_full = value_states
-                value_scale = None
-                value_mn = None
-                value_states_p, value_states_q = None, None
-            else:
-                #### initial quantization
-                residual = value_states.shape[-2] % self.residual_length
-                quant_legnth = value_states.shape[-2] - residual
-                value_states_quant = value_states[:, :, :quant_legnth, :].contiguous()
-                value_states_full = value_states[:, :, quant_legnth:, :].contiguous()
+            # if value_states.shape[-2] <= self.residual_length:
+            #     value_states_quant = None
+            #     value_states_full = value_states
+            #     value_scale = None
+            #     value_mn = None
+            #     value_states_p, value_states_q = None, None
+            # else:
+            #     #### initial quantization
+            #     residual = value_states.shape[-2] % self.residual_length
+            #     quant_legnth = value_states.shape[-2] - residual
+            #     value_states_quant = value_states[:, :, :quant_legnth, :].contiguous()
+            #     value_states_full = value_states[:, :, quant_legnth:, :].contiguous()
                 
-                value_states_quant, value_scale, value_mn, value_states_p, value_states_q = value_compression(
-                    value_states_quant,
-                    self.compress_config
-                )
-                value_states_p =[value_states_p]
-                value_states_q = [value_states_q]
+            #     value_states_quant, value_scale, value_mn, value_states_p, value_states_q = value_compression(
+            #         value_states_quant,
+            #         self.compress_config
+            #     )
+            #     value_states_p =[value_states_p]
+            #     value_states_q = [value_states_q]
+            if to_compress_value is not None:
+                    value_states_quant, value_scale, value_mn, value_states_p, value_states_q = value_compression(
+                        to_compress_value, self.compress_config
+                    )
+                    value_states_p = [value_states_p]
+                    value_states_q = [value_states_q]
+            else:
+                    value_states_quant = None
+                    value_scale = None
+                    value_mn = None
+                    value_states_p, value_states_q = None, None
+            value_states_full = value_fp_buffer.get_fp_view()
+                            
             if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
                 raise ValueError(
                     f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
@@ -453,7 +634,7 @@ class LlamaAttention_GEAR(nn.Module):
                 attn_weights, dim=-1, dtype=torch.float32
             ).to(query_states.dtype)
 
-            attn_output = torch.matmul(attn_weights, value_states) 
+            attn_output = torch.matmul(attn_weights, value_states)  #The quantization error on the cached tokens is the whole point of the compression scheme (you trade a little accuracy for memory). The prefill itself is still fully correct. The inconsistency is just that prefill used exact FP values while decode uses quantized approximations — but that's true of ALL KV cache quantization methods, not just this one. So line 637 is fine as-is.
         
         past_key_value = (key_states_quant_trans, key_states_full, key_scale_trans, key_mn_trans, value_states_quant, value_states_full, value_scale, value_mn, kv_seq_len,
                           key_states_p,
@@ -463,7 +644,9 @@ class LlamaAttention_GEAR(nn.Module):
                           value_states_p,
                           value_states_q,
                           None,
-                          None) if use_cache else None
+                          None,
+                          key_fp_buffer,  #handing to the next layer    # [17] — NEW
+                     value_fp_buffer  ) if use_cache else None
         if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
             raise ValueError(
                 f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
