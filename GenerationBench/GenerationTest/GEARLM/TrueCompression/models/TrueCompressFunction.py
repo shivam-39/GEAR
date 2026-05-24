@@ -142,7 +142,7 @@ def fake_quant_error_simulation(input: torch.Tensor, quantize_bit):
     min, max = input.min(), input.max()
     step = (max - min) / (pow(2, quantize_bit) - 1)
     # print("before min max:",min,max,step)
-    error = input - torch.round((input - min) / step)
+    error = input - (torch.round((input - min) / step)* step + min)
     return error, min, step
 
 
@@ -151,8 +151,8 @@ def true_poweriteration(input: torch.Tensor, loop, rank, p_base=None, q_base=Non
     # -> [batch,seq_len,model_dim] -> [batch * seq_len,model_dim]
     # p_base = torch.rand(input.shape[3] * input.shape[1], rank).to(device)
     # q_base = torch.rand(input.shape[0] * input.shape[2], rank).to(device)
-    loop = int(loop)   ##check is int casting required
-    rank = int(rank)
+    # loop = int(loop)   ##check is int casting required
+    # rank = int(rank)
     batch, num_head, seq_len, sep_dim = input.shape
     
     # Use adaptive rank if no rank is passed (rank <= 0)
