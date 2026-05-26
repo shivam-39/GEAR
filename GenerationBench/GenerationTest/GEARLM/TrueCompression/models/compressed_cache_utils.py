@@ -137,11 +137,11 @@ class FPBuffer:
             buf_part = remainder[..., recency_part:, :]
             self._buffer = buf_part if buf_part.shape[-2] > 0 else None
             self._initialised = True
-            print(
-                f"[FPBuffer] PREFILL OK | prefill_len={T} | "
-                f"sink={self._sink_len()} | recency={self._recency_len()} | "
-                f"buffer_len={self._buffer_len_cur()} | no compression needed"
-            )
+            # print(
+            #     f"[FPBuffer] PREFILL OK | prefill_len={T} | "
+            #     f"sink={self._sink_len()} | recency={self._recency_len()} | "
+            #     f"buffer_len={self._buffer_len_cur()} | no compression needed"
+            # )
             return None
 
         # ── Subsequent calls: decoding ────────────────────────────────────────

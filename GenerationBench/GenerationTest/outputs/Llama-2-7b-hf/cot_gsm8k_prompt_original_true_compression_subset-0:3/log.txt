@@ -1,8 +1,0 @@
-05/15/2026 14:51:13 - INFO - root - Using device: mps
-05/15/2026 14:51:13 - INFO - root - compress_config: None
-05/15/2026 14:51:13 - INFO - root - Loading TrueCompression Llama model from: meta-llama/Llama-2-7b-hf
-05/15/2026 14:52:22 - INFO - root - Preprocessing the dataset.
-05/15/2026 15:02:46 - INFO - root - Using device: mps
-05/15/2026 15:02:46 - INFO - root - compress_config: None
-05/15/2026 15:02:46 - INFO - root - Loading TrueCompression Llama model from: meta-llama/Llama-2-7b-hf
-05/15/2026 15:03:55 - INFO - root - Preprocessing the dataset.

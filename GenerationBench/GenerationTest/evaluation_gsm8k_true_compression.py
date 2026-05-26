@@ -287,7 +287,7 @@ if __name__ == "__main__":
 
     config = transformers.AutoConfig.from_pretrained(
         args.model,
-        use_flash_attn=False,
+        use_flash_attn=True,
         trust_remote_code=True,
         **({"token": args.hf_token} if args.hf_token else {}),
     )
@@ -327,15 +327,15 @@ if __name__ == "__main__":
             prompt_cot = handle.read()
     
 
-    few_shot_pairs = []
-    if not args.zero_shot:
-        blocks = [b.strip() for b in prompt_cot.strip().split("\n\n") if b.strip()]
-        for block in blocks:
-            lines = block.split("\n")
-            ex_q = lines[0].replace("Question: ", "", 1).strip()
-            ex_a = "\n".join(lines[1:]).strip()
-            few_shot_pairs.append((ex_q, ex_a))
-        logging.info(f"Parsed {len(few_shot_pairs)} few-shot examples from prompt file.")
+    # few_shot_pairs = []
+    # if not args.zero_shot:
+    #     blocks = [b.strip() for b in prompt_cot.strip().split("\n\n") if b.strip()]
+    #     for block in blocks:
+    #         lines = block.split("\n")
+    #         ex_q = lines[0].replace("Question: ", "", 1).strip()
+    #         ex_a = "\n".join(lines[1:]).strip()
+    #         few_shot_pairs.append((ex_q, ex_a))
+    logging.info(f"Loaded prompt from lib_prompt/{args.prompt_file}")
     dataloader = torch.utils.data.DataLoader(
         cast(torch.utils.data.Dataset, eval_dataset),
         batch_size=args.batch_size,
@@ -380,40 +380,50 @@ if __name__ == "__main__":
             #         )
             #     )
 
-            prompts = []
-            for question in questions:
-                if args.zero_shot:
-                    messages = [
-                        {
-                            "role": "system",
-                            "content": "Solve math problems. Respond only with: The answer is X.",
-                        },
-                        {"role": "user", "content": question},
-                    ]
-                else:
-                    # Each few-shot example is a separate user/assistant turn so the
-                    # model sees the CoT format as prior assistant behaviour to imitate.
-                    messages = [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are a helpful math assistant. "
-                                "Solve problems step by step and end every answer with '#### <number>'."
-                            ),
-                        }
-                    ]
-                    for ex_q, ex_a in few_shot_pairs:
-                        messages.append({"role": "user", "content": ex_q})
-                        messages.append({"role": "assistant", "content": ex_a})
-                    messages.append({"role": "user", "content": question})
+            # prompts = []
+            # for question in questions:
+            #     if args.zero_shot:
+            #         messages = [
+            #             {
+            #                 "role": "system",
+            #                 "content": "Solve math problems. Respond only with: The answer is X.",
+            #             },
+            #             {"role": "user", "content": question},
+            #         ]
+            #     else:
+            #         # Each few-shot example is a separate user/assistant turn so the
+            #         # model sees the CoT format as prior assistant behaviour to imitate.
+            #         messages = [
+            #             {
+            #                 "role": "system",
+            #                 "content": (
+            #                     "You are a helpful math assistant. "
+            #                     "Solve problems step by step and end every answer with '#### <number>'."
+            #                 ),
+            #             }
+            #         ]
+            #         for ex_q, ex_a in few_shot_pairs:
+            #             messages.append({"role": "user", "content": ex_q})
+            #             messages.append({"role": "assistant", "content": ex_a})
+            #         messages.append({"role": "user", "content": question})
 
-                prompts.append(
-                    tokenizer.apply_chat_template(
-                        messages,
-                        tokenize=False,
-                        add_generation_prompt=True,
-                    )
-                )
+            #     prompts.append(
+            #         tokenizer.apply_chat_template(
+            #             messages,
+            #             tokenize=False,
+            #             add_generation_prompt=True,
+            #         )
+            #     )
+            if args.zero_shot:
+                prompts = [
+                    "Answer the question. The answer is xxx.\nQuestion: " + question + "\n"
+                    for question in questions
+                ]
+            else:
+                prompts = [
+                    prompt_cot + "\nQuestion: " + question + "\n"
+                    for question in questions
+                ]
 
             inputs = tokenizer(
                 prompts,
@@ -428,12 +438,20 @@ if __name__ == "__main__":
                 return_dict_in_generate=True,
                 max_length=args.max_length,
                 max_new_tokens=args.max_new_tokens,
+                output_scores=True,
                 pad_token_id=tokenizer.eos_token_id,
                 use_cache=True,
-                repetition_penalty=1.3, #to avoid the repetition of the same answer
-                # stop_sequences=["####"], #the token to stop the generation
-                # stopping_criteria=[StoppingCriteriaSub(stops=[tokenizer.encode("####")])],
-            )
+            ) 
+            # generate_kwargs = dict(
+            #     return_dict_in_generate=True,
+            #     max_length=args.max_length,
+            #     max_new_tokens=args.max_new_tokens,
+            #     pad_token_id=tokenizer.eos_token_id,
+            #     use_cache=True,
+            #     # repetition_penalty=1.3, #to avoid the repetition of the same answer
+            #     # stop_sequences=["####"], #the token to stop the generation
+            #     # stopping_criteria=[StoppingCriteriaSub(stops=[tokenizer.encode("####")])],
+            # )
             if args.do_sample:
                 generate_kwargs["do_sample"] = True
                 generate_kwargs["temperature"] = args.temperature
