@@ -321,7 +321,7 @@ if __name__ == "__main__":
             instruction_prompt = "\nAnswer the following question.\n"
 
         with torch.no_grad():
-            with generation_file.open("w") as fd:
+            with generation_file.open("w", encoding="utf-8") as fd:
                 for batch in tqdm(dataloader, desc=f"Evaluate {task}"):
                     questions = batch["input"]
                     if not args.zeroshot:
@@ -355,7 +355,7 @@ if __name__ == "__main__":
                         max_new_tokens=args.max_new_tokens,
                         pad_token_id=tokenizer.eos_token_id,
                         use_cache=True,
-                        repetition_penalty=1.3,
+                        # repetition_penalty=1.3,
                     )
                     if args.do_sample:
                         generate_kwargs["do_sample"] = True

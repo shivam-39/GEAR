@@ -149,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--example_subset",
         type=str,
-        default="0:10",
+        default=None,
         help="Dataset slice, e.g. '0:10' or None for full test set.",
     )
     parser.add_argument("--max_length", type=int, default=None, help="")

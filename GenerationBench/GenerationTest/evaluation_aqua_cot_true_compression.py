@@ -32,6 +32,12 @@ from torch.utils.tensorboard import SummaryWriter
 from GEARLM import GearLlamaForCausalLMNew
 from transformers import AutoTokenizer
 
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+    logging.warning("matplotlib not available; rank distribution plot will be skipped.")
+
 def preprocess_aqua_dataset(dataset):
     def add_text_options(example):
         example["text_options"] = "\n".join(example["options"])
@@ -176,6 +182,28 @@ if __name__ == "__main__":
         }
     logging.info(f"compress_config: {compress_config}")
 
+    rank_distribution = []
+    try:
+        from GEARLM.TrueCompression.models import TrueCompressFunction
+
+        _original_get_adaptive_rank = TrueCompressFunction.get_adaptive_rank
+
+        def _logged_get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
+            rank = _original_get_adaptive_rank(tensor, energy_threshold)
+            if isinstance(rank, torch.Tensor):
+                rank_distribution.extend(rank.detach().cpu().tolist())
+            else:
+                rank_distribution.append(int(rank))
+            return rank
+
+        TrueCompressFunction.get_adaptive_rank = _logged_get_adaptive_rank
+        logging.info("Patched TrueCompressFunction.get_adaptive_rank for rank logging")
+    except Exception as exc:
+        logging.warning(
+            "Could not patch TrueCompressFunction.get_adaptive_rank for rank logging: %s",
+            exc,
+        )
+
     # Model + tokenizer
     if device.type == "cuda":
         model_kwargs = {
@@ -244,9 +272,10 @@ if __name__ == "__main__":
             return_dict_in_generate=True,
             max_length=args.max_length,
             max_new_tokens=args.max_new_tokens,
+            output_scores=True,
             pad_token_id=tokenizer.eos_token_id,
             use_cache=True,
-            repetition_penalty=1.3,
+            # repetition_penalty=1.3,
         )
         if args.do_sample:
             generate_kwargs["do_sample"] = True
@@ -290,3 +319,23 @@ if __name__ == "__main__":
     tb_writter.add_scalar(f"{args.dataset_split}/accuracy", total_acc, 1)
     with results_file.open("w") as handle:
         json.dump(evaluation_result.to_dict(), handle)
+
+    if len(rank_distribution) > 0:
+        if plt is not None:
+            ranks = np.asarray(rank_distribution, dtype=np.int64)
+            counts = np.bincount(ranks)
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.bar(np.arange(len(counts)), counts, edgecolor="black")
+            ax.set_title("Adaptive Rank Distribution")
+            ax.set_xlabel("Rank")
+            ax.set_ylabel("Count")
+            ax.set_xticks(np.arange(len(counts)))
+            fig.tight_layout()
+            plot_path = output_dir / "rank_distribution.png"
+            fig.savefig(plot_path, dpi=150)
+            plt.close(fig)
+            logging.info("Saved adaptive rank distribution plot to %s", plot_path)
+        else:
+            logging.warning("matplotlib not available; rank distribution plot was not generated")
+    else:
+        logging.info("No adaptive rank values were recorded; skipping rank distribution plot")
