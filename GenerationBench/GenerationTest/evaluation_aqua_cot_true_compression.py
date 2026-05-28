@@ -244,9 +244,10 @@ if __name__ == "__main__":
             return_dict_in_generate=True,
             max_length=args.max_length,
             max_new_tokens=args.max_new_tokens,
+            output_scores=True,
             pad_token_id=tokenizer.eos_token_id,
             use_cache=True,
-            repetition_penalty=1.3,
+            # repetition_penalty=1.3,
         )
         if args.do_sample:
             generate_kwargs["do_sample"] = True

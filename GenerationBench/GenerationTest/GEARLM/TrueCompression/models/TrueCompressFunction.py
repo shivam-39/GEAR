@@ -172,8 +172,8 @@ def true_poweriteration(input: torch.Tensor, loop, rank, p_base=None, q_base=Non
         p_base[0] = p_base[0].float()
         q_base[0] = q_base[0].float()
     else:
-        p_base = [torch.rand(batch, sep_dim * num_head, rank).to(input.device).float()]
-        q_base = [torch.rand(batch, seq_len, rank).to(input.device).float()]
+        p_base = [torch.rand(batch, sep_dim * num_head, int(rank)).to(input.device).float()]
+        q_base = [torch.rand(batch, seq_len, int(rank)).to(input.device).float()]
     # 3 calculation = loop * (matmul) + 2 * qrO(n^2)
     for i in range(loop):
         if i == loop - 1:
