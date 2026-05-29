@@ -317,7 +317,7 @@ def headwise_lrap(tensor: torch.Tensor, rank, loop):
     return p_base, q_base
 
 
-def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
+def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.5):
     # print("Calculating adaptive rank...")
     shape = tensor.shape
     batch, num_head, seq_len, head_dim = shape

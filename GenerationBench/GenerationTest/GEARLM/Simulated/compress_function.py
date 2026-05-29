@@ -29,7 +29,7 @@ class H2OCache:
         return key_states, value_states, query_states
 
 
-def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
+def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.5):
     # print("Calculating adaptive rank...")
     shape = tensor.shape
     batch, num_head, seq_len, head_dim = shape

@@ -1,8 +1,22 @@
 import torch
 import time
 
+# Module-level variable to track adaptive ranks for plotting
+_adaptive_rank_distribution = []
 
-def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
+
+def get_rank_distribution():
+    """Get the list of recorded adaptive ranks."""
+    return _adaptive_rank_distribution
+
+
+def clear_rank_distribution():
+    """Clear the recorded adaptive ranks."""
+    global _adaptive_rank_distribution
+    _adaptive_rank_distribution = []
+
+
+def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.5):
     """Calculate adaptive rank based on SVD energy threshold."""
     # Reshape tensor to [batch, seq_len, num_head * sep_dim] for combined-head SVD
     # print(f"[GET_ADAPTIVE_RANK] Computing SVD for tensor shape {tensor.shape}")
@@ -16,6 +30,18 @@ def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
     u, s, v = torch.linalg.svd(tensor_float, full_matrices=False)
     energy = torch.cumsum(s**2, dim=-1) / torch.sum(s**2, dim=-1, keepdim=True)
     rank = torch.sum(energy < energy_threshold, dim=-1)
+    
+    # Record adaptive ranks for distribution plot
+    if isinstance(rank, torch.Tensor):
+        rank_list = rank.detach().cpu().tolist()
+        _adaptive_rank_distribution.extend(rank_list)
+        # print(f"[DEBUG] Recording {len(rank_list)} ranks to distribution")
+    else:
+        _adaptive_rank_distribution.append(int(rank))
+        # print(f"[DEBUG] Recording 1 rank to distribution")
+    
+    # print(f"[DEBUG] Total ranks recorded so far: {len(_adaptive_rank_distribution)}")
+    
     return rank
 
 

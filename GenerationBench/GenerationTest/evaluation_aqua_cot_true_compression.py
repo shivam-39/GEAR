@@ -182,27 +182,21 @@ if __name__ == "__main__":
         }
     logging.info(f"compress_config: {compress_config}")
 
-    rank_distribution = []
+    # Import rank tracking functions from TrueCompressFunction
     try:
-        from GEARLM.TrueCompression.models import TrueCompressFunction
-
-        _original_get_adaptive_rank = TrueCompressFunction.get_adaptive_rank
-
-        def _logged_get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
-            rank = _original_get_adaptive_rank(tensor, energy_threshold)
-            if isinstance(rank, torch.Tensor):
-                rank_distribution.extend(rank.detach().cpu().tolist())
-            else:
-                rank_distribution.append(int(rank))
-            return rank
-
-        TrueCompressFunction.get_adaptive_rank = _logged_get_adaptive_rank
-        logging.info("Patched TrueCompressFunction.get_adaptive_rank for rank logging")
+        from GEARLM.TrueCompression.models.TrueCompressFunction import (
+            clear_rank_distribution,
+            get_rank_distribution,
+        )
+        # Clear any previous rank distribution data
+        clear_rank_distribution()
+        logging.info("Initialized rank distribution tracking")
     except Exception as exc:
         logging.warning(
-            "Could not patch TrueCompressFunction.get_adaptive_rank for rank logging: %s",
+            "Could not initialize rank distribution tracking: %s",
             exc,
         )
+        get_rank_distribution = None
 
     # Model + tokenizer
     if device.type == "cuda":
@@ -320,17 +314,34 @@ if __name__ == "__main__":
     with results_file.open("w") as handle:
         json.dump(evaluation_result.to_dict(), handle)
 
+    # Get rank distribution data
+    if get_rank_distribution is not None:
+        rank_distribution = get_rank_distribution()
+    else:
+        rank_distribution = []
+    
     if len(rank_distribution) > 0:
         if plt is not None:
             ranks = np.asarray(rank_distribution, dtype=np.int64)
             counts = np.bincount(ranks)
-            fig, ax = plt.subplots(figsize=(10, 5))
-            ax.bar(np.arange(len(counts)), counts, edgecolor="black")
-            ax.set_title("Adaptive Rank Distribution")
-            ax.set_xlabel("Rank")
-            ax.set_ylabel("Count")
-            ax.set_xticks(np.arange(len(counts)))
-            fig.tight_layout()
+            fig, ax = plt.subplots(figsize=(14, 6))
+            ax.bar(np.arange(len(counts)), counts, color="skyblue", edgecolor='black', linewidth=0.5)
+            ax.set_title("Adaptive Rank Distribution", fontsize=14, fontweight='bold')
+            ax.set_xlabel("Rank", fontsize=12)
+            ax.set_ylabel("Count", fontsize=12)
+            
+            # Limit the number of x-ticks to avoid overcrowding
+            num_ticks = min(len(counts), 20)  # Show at most 20 ticks
+            tick_positions = np.linspace(0, len(counts) - 1, num_ticks, dtype=int)
+            ax.set_xticks(tick_positions)
+            ax.set_xticklabels(tick_positions, rotation=45, ha='right', fontsize=10)
+            
+            # Set minor ticks for all positions
+            ax.set_xticks(np.arange(len(counts)), minor=True)
+            ax.grid(True, which='minor', axis='x', alpha=0.2, linestyle=':')
+            ax.grid(True, which='major', axis='y', alpha=0.3)
+            
+            fig.subplots_adjust(bottom=0.15)
             plot_path = output_dir / "rank_distribution.png"
             fig.savefig(plot_path, dpi=150)
             plt.close(fig)
