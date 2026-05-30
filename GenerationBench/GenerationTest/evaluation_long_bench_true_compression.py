@@ -558,7 +558,10 @@ if __name__ == "__main__":
 
     # ── Dataset ─────────────────────────────────────────────────────────────────
     split = "test" if args.example_subset is None else f"test[{args.example_subset}]"
+    # eval_dataset = load_dataset("THUDM/LongBench", task, split=split)
     eval_dataset = load_dataset("THUDM/LongBench", task, split=split)
+    if "all_classes" in eval_dataset.column_names:
+        eval_dataset = eval_dataset.remove_columns(["all_classes"])
 
     # ── Logging ─────────────────────────────────────────────────────────────────
     tb_writter = SummaryWriter(log_dir=str(output_dir.resolve()))
