@@ -1,5 +1,6 @@
-from .TrueCompression import GearLlamaForCausalLMNew
 from .TrueCompression import GearLlamaForCausalLM
+from .TrueCompression import GearLlamaForCausalLMNew
+from .TrueCompression import GearMistralForCausalLMNew
 
 from .Simulated import CompressionConfig
 from .Simulated import SimulatedGearLlamaForCausalLM

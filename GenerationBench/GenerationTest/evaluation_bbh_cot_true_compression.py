@@ -1,14 +1,16 @@
 """
-BBH-CoT evaluation for the TrueCompression method (GearLlamaForCausalLMNew).
+BBH-CoT evaluation for the TrueCompression method (GearLlamaForCausalLMNew / GearMistralForCausalLMNew).
 
-NOTE: TrueCompression currently only supports Llama-architecture models.
-      Pass a local or HF Llama checkpoint with --model.
+NOTE: TrueCompression supports Llama and Mistral-architecture models.
+      Pass a local or HF Llama or Mistral checkpoint with --model.
+      The script automatically detects the model architecture.
 
 This script is based on evaluation_bbh_cot.py and evaluation_gsm8k_true_compression.py:
-  - Uses GearLlamaForCausalLMNew for TrueCompression evaluation
+  - Imports GearLlamaForCausalLMNew for Llama or GearMistralForCausalLMNew for Mistral
   - Builds compress_config as a plain dict (no copy_for_all_attention / calculate_compress_ratio_list)
   - Adds --stream, --buffer_len, --compress_mode args for the new cache path
   - Auto-selects device: cuda → mps → cpu
+  - Auto-detects model architecture (Llama or Mistral) and uses appropriate model class
   - Writes output JSON to evaluation_bbh_cot_true_compression.json to avoid clobbering Simulated results
 """
 
@@ -32,6 +34,7 @@ from dataclasses_json import DataClassJsonMixin
 from datasets import load_dataset
 from torch.utils.tensorboard import SummaryWriter
 from GEARLM import GearLlamaForCausalLMNew
+from GEARLM.TrueCompression.models.TrueCompressionMistral import GearMistralForCausalLMNew
 from transformers import AutoTokenizer
 
 logger = logging.getLogger(__name__)
@@ -269,8 +272,22 @@ if __name__ == "__main__":
         **({"token": args.hf_token} if args.hf_token else {}),
     )
 
-    logging.info(f"Loading TrueCompression Llama model from: {args.model}")
-    model = GearLlamaForCausalLMNew.from_pretrained(
+    # Detect model architecture and select appropriate model class
+    model_type = config.model_type.lower()
+    if "mistral" in model_type:
+        ModelClass = GearMistralForCausalLMNew
+        model_arch_name = "Mistral"
+    elif "llama" in model_type:
+        ModelClass = GearLlamaForCausalLMNew
+        model_arch_name = "Llama"
+    else:
+        raise ValueError(
+            f"Unsupported model architecture: {model_type}. "
+            f"Supported architectures: llama, mistral"
+        )
+
+    logging.info(f"Loading TrueCompression {model_arch_name} model from: {args.model}")
+    model = ModelClass.from_pretrained(
         args.model,
         config=config,
         compress_config=compress_config,

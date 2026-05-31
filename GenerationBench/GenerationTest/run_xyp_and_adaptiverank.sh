@@ -41,7 +41,7 @@
 #   --compress_mode gear \
 #   --batch_size 1 \
 #   --quantize_bit 4 \
-#   --rank 1 \
+#   --rank 8 \
 #   --loop 3 \
 #   --left 0.02 \
 #   --sink_tokens 4 \
@@ -57,7 +57,7 @@
 #   --compress_mode gear \
 #   --batch_size 2 \
 #   --quantize_bit 4 \
-#   --rank 4 \
+#   --rank 8 \
 #   --loop 3 \
 #   --left 0.02 \
 #   --sink_tokens 4 \
@@ -66,6 +66,9 @@
 #   --max_new_tokens 256
 
 
+
+
+##############################################################################################################
 
   #coherent text generation test
 #   cd GenerationBench/GenerationTest
@@ -92,3 +95,57 @@
 #   --max_new_tokens 512 \
 #   --model_max_length 4096 \
 #   --compress_method None
+
+
+
+##############################################################################################################
+# Mistral tests
+
+
+# python evaluation_gsm8k_true_compression.py \
+#   --model mistralai/Mistral-7B-Instruct-v0.3 \
+#   --prompt_file gsm8k_prompt_original.txt \
+#   # --example_subset 0:2 \
+#   --compress_method GEAR \
+#   --compress_mode gear \
+#   --batch_size 4 \
+#   --quantize_bit 4 \
+#   --rank 8 \
+#   --loop 3 \
+#   --left 0.02 \
+#   --sink_tokens 16 \
+#   --recency_tokens 64 \
+#   --buffer_len 20 \
+#   --max_new_tokens 256
+
+
+# python evaluation_aqua_cot_true_compression.py \
+#   --model mistralai/Mistral-7B-Instruct-v0.3 \
+#   # --example_subset 0:2 \
+#   --compress_method GEAR \
+#   --compress_mode gear \
+#   --batch_size 4 \
+#   --quantize_bit 4 \
+#   --rank 8 \
+#   --loop 3 \
+#   --left 0.02 \
+#   --sink_tokens 16 \
+#   --recency_tokens 64 \
+#   --buffer_len 20 \
+#   --max_new_tokens 256
+
+
+python evaluation_bbh_cot_true_compression.py \
+  --model mistralai/Mistral-7B-Instruct-v0.3 \
+  # --example_subset 0:10 \
+  --compress_method GEAR \
+  --compress_mode gear \
+  --batch_size 2 \
+  --quantize_bit 4 \
+  --rank 8 \
+  --loop 3 \
+  --left 0.02 \
+  --sink_tokens 4 \
+  --recency_tokens 64 \
+  --buffer_len 20 \
+  --max_new_tokens 256
