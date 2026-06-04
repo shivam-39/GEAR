@@ -1,5 +1,5 @@
-#!/bin/bash
-# Test script to verify adaptive rank is being used in GEAR compression
+# Activate the virtual environment
+source /home/cse240d-fal26-lora/GEAR/cse240venv/bin/activate
 
 # python evaluation_gsm8k_true_compression.py \
 #   --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
@@ -39,9 +39,9 @@
 #   --model meta-llama/Meta-Llama-3-8B \
 #   --compress_method GEAR \
 #   --compress_mode gear \
-#   --batch_size 1 \
-#   --quantize_bit 4 \
-#   --rank 8 \
+#   --batch_size 2 \
+#   --quantize_bit 2 \
+#   --rank 1 \
 #   --loop 3 \
 #   --left 0.02 \
 #   --sink_tokens 4 \
@@ -125,8 +125,8 @@
 #   --compress_method GEAR \
 #   --compress_mode gear \
 #   --batch_size 4 \
-#   --quantize_bit 4 \
-#   --rank 8 \
+#   --quantize_bit 2 \
+#   --rank 1 \
 #   --loop 3 \
 #   --left 0.02 \
 #   --sink_tokens 16 \
@@ -135,17 +135,17 @@
 #   --max_new_tokens 256
 
 
-python evaluation_bbh_cot_true_compression.py \
-  --model mistralai/Mistral-7B-Instruct-v0.3 \
-  # --example_subset 0:10 \
-  --compress_method GEAR \
-  --compress_mode gear \
-  --batch_size 2 \
-  --quantize_bit 4 \
-  --rank 8 \
-  --loop 3 \
-  --left 0.02 \
-  --sink_tokens 4 \
-  --recency_tokens 64 \
-  --buffer_len 20 \
-  --max_new_tokens 256
+# python evaluation_bbh_cot_true_compression.py \
+#   --model mistralai/Mistral-7B-Instruct-v0.3 \
+#   # --example_subset 0:10 \
+#   --compress_method GEAR \
+#   --compress_mode gear \
+#   --batch_size 6 \
+#   --quantize_bit 4 \
+#   --rank 8 \
+#   --loop 3 \
+#   --left 0.02 \
+#   --sink_tokens 4 \
+#   --recency_tokens 64 \
+#   --buffer_len 20 \
+#   --max_new_tokens 256
