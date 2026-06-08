@@ -24,13 +24,13 @@ source /home/cse240d-fal26-lora/GEAR/cse240venv/bin/activate
 #   # --example_subset 0:10 \
 #   --compress_method GEAR \
 #   --compress_mode gear \
-#   --batch_size 4 \
-#   --quantize_bit 4 \
-#   --rank 8 \
+#   --batch_size 6 \
+#   --quantize_bit 2 \
+#   --rank 4 \
 #   --loop 3 \
 #   --left 0.02 \
-#   --sink_tokens 4 \
-#   --recency_tokens 64 \
+#   --sink_tokens 16 \
+#   --recency_tokens 32 \
 #   --buffer_len 20 \
 #   --max_new_tokens 256
 
@@ -39,31 +39,31 @@ source /home/cse240d-fal26-lora/GEAR/cse240venv/bin/activate
 #   --model meta-llama/Meta-Llama-3-8B \
 #   --compress_method GEAR \
 #   --compress_mode gear \
-#   --batch_size 2 \
+#   --batch_size 1 \
 #   --quantize_bit 2 \
-#   --rank 1 \
+#   --rank 4 \
 #   --loop 3 \
 #   --left 0.02 \
-#   --sink_tokens 4 \
-#   --recency_tokens 64 \
+#   --sink_tokens 16 \
+#   --recency_tokens 32 \
 #   --buffer_len 20 \
 #   --max_new_tokens 256
 
 
-# python evaluation_bbh_cot_true_compression.py \
-#   --model meta-llama/Meta-Llama-3-8B \
-#   # --example_subset 0:10 \
-#   --compress_method GEAR \
-#   --compress_mode gear \
-#   --batch_size 2 \
-#   --quantize_bit 4 \
-#   --rank 8 \
-#   --loop 3 \
-#   --left 0.02 \
-#   --sink_tokens 4 \
-#   --recency_tokens 64 \
-#   --buffer_len 20 \
-#   --max_new_tokens 256
+python evaluation_bbh_cot_true_compression.py \
+  --model meta-llama/Meta-Llama-3-8B \
+  # --example_subset 0:10 \
+  --compress_method GEAR \
+  --compress_mode gear \
+  --batch_size 6 \
+  --quantize_bit 4 \
+  --rank 4 \
+  --loop 3 \
+  --left 0.02 \
+  --sink_tokens 16 \
+  --recency_tokens 32 \
+  --buffer_len 20 \
+  --max_new_tokens 256
 
 
 
@@ -108,13 +108,13 @@ source /home/cse240d-fal26-lora/GEAR/cse240venv/bin/activate
 #   # --example_subset 0:2 \
 #   --compress_method GEAR \
 #   --compress_mode gear \
-#   --batch_size 4 \
-#   --quantize_bit 4 \
-#   --rank 8 \
+#   --batch_size 6 \
+#   --quantize_bit 2 \
+#   --rank 4 \
 #   --loop 3 \
 #   --left 0.02 \
 #   --sink_tokens 16 \
-#   --recency_tokens 64 \
+#   --recency_tokens 32 \
 #   --buffer_len 20 \
 #   --max_new_tokens 256
 
@@ -124,13 +124,13 @@ source /home/cse240d-fal26-lora/GEAR/cse240venv/bin/activate
 #   # --example_subset 0:2 \
 #   --compress_method GEAR \
 #   --compress_mode gear \
-#   --batch_size 4 \
+#   --batch_size 6 \
 #   --quantize_bit 2 \
-#   --rank 1 \
+#   --rank 4 \
 #   --loop 3 \
 #   --left 0.02 \
 #   --sink_tokens 16 \
-#   --recency_tokens 64 \
+#   --recency_tokens 32 \
 #   --buffer_len 20 \
 #   --max_new_tokens 256
 
@@ -140,12 +140,12 @@ source /home/cse240d-fal26-lora/GEAR/cse240venv/bin/activate
 #   # --example_subset 0:10 \
 #   --compress_method GEAR \
 #   --compress_mode gear \
-#   --batch_size 6 \
-#   --quantize_bit 4 \
-#   --rank 8 \
+#   --batch_size 1 \
+#   --quantize_bit 2 \
+#   --rank 4 \
 #   --loop 3 \
 #   --left 0.02 \
-#   --sink_tokens 4 \
-#   --recency_tokens 64 \
+#   --sink_tokens 16 \
+#   --recency_tokens 32 \
 #   --buffer_len 20 \
 #   --max_new_tokens 256
