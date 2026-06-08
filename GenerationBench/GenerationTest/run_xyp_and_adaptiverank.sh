@@ -50,20 +50,20 @@ source /home/cse240d-fal26-lora/GEAR/cse240venv/bin/activate
 #   --max_new_tokens 256
 
 
-python evaluation_bbh_cot_true_compression.py \
-  --model meta-llama/Meta-Llama-3-8B \
-  # --example_subset 0:10 \
-  --compress_method GEAR \
-  --compress_mode gear \
-  --batch_size 6 \
-  --quantize_bit 4 \
-  --rank 4 \
-  --loop 3 \
-  --left 0.02 \
-  --sink_tokens 16 \
-  --recency_tokens 32 \
-  --buffer_len 20 \
-  --max_new_tokens 256
+# python evaluation_bbh_cot_true_compression.py \
+#   --model meta-llama/Meta-Llama-3-8B \
+#   # --example_subset 0:10 \
+#   --compress_method GEAR \
+#   --compress_mode gear \
+#   --batch_size 6 \
+#   --quantize_bit 2 \
+#   --rank 4 \
+#   --loop 3 \
+#   --left 0.02 \
+#   --sink_tokens 16 \
+#   --recency_tokens 32 \
+#   --buffer_len 20 \
+#   --max_new_tokens 256
 
 
 
