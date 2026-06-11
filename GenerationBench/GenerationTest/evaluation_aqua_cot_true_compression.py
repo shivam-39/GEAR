@@ -187,9 +187,10 @@ if __name__ == "__main__":
 
     # Import rank tracking functions from TrueCompressFunction
     try:
-        from GEARLM.TrueCompression.models.TrueCompressFunction import (
+        from GEARLM.TrueCompression.models.rank_tracker import (
             clear_rank_distribution,
             get_rank_distribution,
+            save_rank_distribution_to_csv,
         )
         # Clear any previous rank distribution data
         clear_rank_distribution()
@@ -200,6 +201,7 @@ if __name__ == "__main__":
             exc,
         )
         get_rank_distribution = None
+        save_rank_distribution_to_csv = None
 
     # Model + tokenizer
     if device.type == "cuda":
@@ -338,6 +340,11 @@ if __name__ == "__main__":
         rank_distribution = []
     
     if len(rank_distribution) > 0:
+        logging.info("Recorded %d adaptive rank values", len(rank_distribution))
+        if save_rank_distribution_to_csv is not None:
+            csv_path = output_dir / "adaptive_rank_distribution.csv"
+            save_rank_distribution_to_csv(str(csv_path))
+            logging.info("Saved adaptive rank distribution CSV to %s", csv_path)
         if plt is not None:
             ranks = np.asarray(rank_distribution, dtype=np.int64)
             counts = np.bincount(ranks)

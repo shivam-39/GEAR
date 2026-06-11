@@ -38,6 +38,12 @@ from GEARLM import GearLlamaForCausalLMNew
 from GEARLM.TrueCompression.models.TrueCompressionMistral import GearMistralForCausalLMNew
 from transformers import AutoTokenizer
 
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+    logging.warning("matplotlib not available; rank distribution plot will be skipped.")
+
 
 IGNORE_INDEX = -100
 DEFAULT_PAD_TOKEN = "[PAD]"
@@ -269,6 +275,23 @@ if __name__ == "__main__":
             "recency_tokens": args.recency_tokens,
         }
     logging.info(f"compress_config: {compress_config}")
+
+    # ── Rank distribution tracking ──────────────────────────────────────────────
+    try:
+        from GEARLM.TrueCompression.models.rank_tracker import (
+            clear_rank_distribution,
+            get_rank_distribution,
+            save_rank_distribution_to_csv,
+        )
+        clear_rank_distribution()
+        logging.info("Initialized rank distribution tracking")
+    except Exception as exc:
+        logging.warning(
+            "Could not initialize rank distribution tracking: %s",
+            exc,
+        )
+        get_rank_distribution = None
+        save_rank_distribution_to_csv = None
 
     # ── Model + tokenizer ────────────────────────────────────────────────────────
     # MPS does not support device_map="auto"; load to CPU first then move to device.
@@ -517,6 +540,46 @@ if __name__ == "__main__":
 
     with evaluation_result_file.open("w") as handle:
         json.dump(evaluation_result.to_dict(), handle)
+
+    # ── Rank distribution outputs ────────────────────────────────────────────────
+    if get_rank_distribution is not None:
+        rank_distribution = get_rank_distribution()
+    else:
+        rank_distribution = []
+
+    if len(rank_distribution) > 0:
+        logging.info("Recorded %d adaptive rank values", len(rank_distribution))
+        if save_rank_distribution_to_csv is not None:
+            csv_path = output_dir / "adaptive_rank_distribution.csv"
+            save_rank_distribution_to_csv(str(csv_path))
+            logging.info("Saved adaptive rank distribution CSV to %s", csv_path)
+        if plt is not None:
+            ranks = np.asarray(rank_distribution, dtype=np.int64)
+            counts = np.bincount(ranks)
+            fig, ax = plt.subplots(figsize=(14, 6))
+            ax.bar(np.arange(len(counts)), counts, color="skyblue", edgecolor="black", linewidth=0.5)
+            ax.set_title("Adaptive Rank Distribution", fontsize=14, fontweight="bold")
+            ax.set_xlabel("Rank", fontsize=12)
+            ax.set_ylabel("Count", fontsize=12)
+
+            num_ticks = min(len(counts), 20)
+            tick_positions = np.linspace(0, len(counts) - 1, num_ticks, dtype=int)
+            ax.set_xticks(tick_positions)
+            ax.set_xticklabels(tick_positions, rotation=45, ha="right", fontsize=10)
+
+            ax.set_xticks(np.arange(len(counts)), minor=True)
+            ax.grid(True, which="minor", axis="x", alpha=0.2, linestyle=":")
+            ax.grid(True, which="major", axis="y", alpha=0.3)
+
+            fig.subplots_adjust(bottom=0.15)
+            plot_path = output_dir / "rank_distribution.png"
+            fig.savefig(plot_path, dpi=150)
+            plt.close(fig)
+            logging.info("Saved adaptive rank distribution plot to %s", plot_path)
+        else:
+            logging.warning("matplotlib not available; rank distribution plot was not generated")
+    else:
+        logging.info("No adaptive rank values were recorded; skipping rank distribution plot")
 
     with generation_file.open("w", encoding="utf-8") as handle:
         for question, generation, answer in zip(
