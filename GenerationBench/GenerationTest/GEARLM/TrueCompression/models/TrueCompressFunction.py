@@ -1,53 +1,13 @@
 import torch
-import time
-import csv
-import os
-
-# Module-level variable to track adaptive ranks for plotting
-_adaptive_rank_distribution = []
+from .rank_tracker import append_rank_distribution
 
 
-def get_rank_distribution():
-    """Get the list of recorded adaptive ranks."""
-    return _adaptive_rank_distribution
-
-
-def clear_rank_distribution():
-    """Clear the recorded adaptive ranks."""
-    global _adaptive_rank_distribution
-    _adaptive_rank_distribution = []
-
-
-def save_rank_distribution_to_csv(filename="adaptive_rank_distribution.csv"):
-    """Save the recorded adaptive ranks to a CSV file."""
-    global _adaptive_rank_distribution
-    
-    if not _adaptive_rank_distribution:
-        print("Warning: No adaptive rank data to save.")
-        return
-    
-    try:
-        # Ensure directory exists
-        directory = os.path.dirname(filename)
-        if directory and not os.path.exists(directory):
-            os.makedirs(directory, exist_ok=True)
-        
-        with open(filename, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(['rank_index', 'adaptive_rank'])
-            for idx, rank in enumerate(_adaptive_rank_distribution):
-                writer.writerow([idx, rank])
-        
-        print(f"Adaptive rank distribution saved to {filename} ({len(_adaptive_rank_distribution)} records)")
-    except Exception as e:
-        print(f"Error saving rank distribution to CSV: {e}")
-
-
-def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.5):
+def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.9):
     """Calculate adaptive rank based on SVD energy threshold."""
     # Reshape tensor to [batch, seq_len, num_head * sep_dim] for combined-head SVD
     # print(f"[GET_ADAPTIVE_RANK] Computing SVD for tensor shape {tensor.shape}")
     if tensor.dim() == 4:
+        # print(f"[GET_ADAPTIVE_RANK] Original tensor shape: {tensor.shape}")
         batch, num_head, seq_len, sep_dim = tensor.shape
         tensor_reshaped = tensor.permute(0, 2, 1, 3).reshape(batch, seq_len, num_head * sep_dim)
     else:
@@ -55,21 +15,17 @@ def get_adaptive_rank(tensor: torch.Tensor, energy_threshold: float = 0.5):
     
     tensor_float = tensor_reshaped.float()
     u, s, v = torch.linalg.svd(tensor_float, full_matrices=False)
+    # print(f"[GET_ADAPTIVE_RANK] SVD computed. Singular values shape: {u.shape}, {s.shape}, {v.shape}")
     energy = torch.cumsum(s**2, dim=-1) / torch.sum(s**2, dim=-1, keepdim=True)
     rank = torch.sum(energy < energy_threshold, dim=-1)
     
     # Record adaptive ranks for distribution plot
     if isinstance(rank, torch.Tensor):
-        rank_list = rank.detach().cpu().tolist()
-        _adaptive_rank_distribution.extend(rank_list)
-        # print(f"[DEBUG] Recording {len(rank_list)} ranks to distribution")
+        append_rank_distribution(rank.detach().cpu().tolist())
     else:
-        _adaptive_rank_distribution.append(int(rank))
-        # print(f"[DEBUG] Recording 1 rank to distribution")
+        append_rank_distribution(int(rank))
     
-    # print(f"[DEBUG] Total ranks recorded so far: {len(_adaptive_rank_distribution)}")
-    
-    return rank
+    return min(rank, 16)  # Cap rank at 16 for practical compression
 
 
 def transfer_8bit_to_4bit(input: torch.Tensor):
@@ -245,10 +201,6 @@ def true_poweriteration(input: torch.Tensor, loop, rank, p_base=None, q_base=Non
     # input = input.type(torch.bfloat16)
     p_base[0] = p_base[0].half()
     q_base[0] = q_base[0].half()
-    
-    # Log adaptive rank distribution
-    if len(_adaptive_rank_distribution) > 0:
-        save_rank_distribution_to_csv()
     
     return p_base, q_base
 
